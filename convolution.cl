@@ -30,3 +30,4 @@ __kernel void convolution(
 
     return;
 }
+
