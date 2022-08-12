@@ -10,6 +10,7 @@ struct timer_info {
 };
 
 static struct timer_info *ti;
+static int timer_num;
 
 void timer_init(int n) {
   ti = (struct timer_info*)malloc(n * sizeof(struct timer_info));
@@ -17,6 +18,7 @@ void timer_init(int n) {
     ti[i].total_time = 0;
     ti[i].is_running = 0;
   }
+  timer_num = n;
 }
 
 void timer_finalize() {
@@ -51,4 +53,8 @@ double timer_read(int idx) {
 void timer_reset(int idx) {
   ti[idx].total_time = 0;
   ti[idx].is_running = 0;
+}
+
+void timer_clear_all(){
+  for(int idx = 0; idx < timer_num; idx++) ti[idx].total_time = 0;
 }

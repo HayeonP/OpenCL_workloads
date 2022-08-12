@@ -1,9 +1,10 @@
 #!/bin/bash
 
-ary_size=1024
-iteration=1000
+ary_size=4096
+iteration=100
 affinity=$1
 priority=$2
+log_name=$3
 
 # ./convolution $ary_size $iteration $affinity $priority
-./convolution 1024 1000 1 1
+./convolution $ary_size $iteration $affinity $priority $log_name

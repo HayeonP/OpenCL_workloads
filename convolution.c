@@ -37,14 +37,17 @@ int main(int argc, char *argv[]) {
 
    /* Parse arguments */
    int ary_size, iteration, affinity, priority;
-   if(argc != 5){
-      printf("Usage: ./convolution <ary_size> <iteration> <affinity> <priority>");
+   char log_path[64] = "./";
+   if(argc != 6){
+      printf("Usage: ./convolution <ary_size> <iteration> <affinity> <priority> <log_name>");
       exit(1);
    }
    ary_size = atoi(argv[1]);
    iteration = atoi(argv[2]);
    affinity = atoi(argv[3]);
    priority = atoi(argv[4]);
+   strcat(log_path, argv[5]);
+   strcat(log_path, ".csv");
 
    /* Init system */   
    set_affinity(affinity);
@@ -52,7 +55,7 @@ int main(int argc, char *argv[]) {
 
    /* Init logging */
    FILE* fp;
-   fopen("./convolution.csv", "w+");
+   fp = fopen(log_path, "w+");
    fprintf(fp, "%s\n", "TOTAL_RESPONSE_TIME,CREATE_BUFFER,WRITE_BUFFER,CREATE_KERNEL_ARGS,CREATE_KERNEL,LAUNCH_KERNEL,READ_BUFFER,KERNEL_EXECUTION_TIME");
 
    /* Init timer */
@@ -98,35 +101,35 @@ int main(int argc, char *argv[]) {
    while(1){
       timer_start(TOTAL_RESPONSE_TIME);
       
-      timer_start(CREATE_BUFFER);
       /* Create data buffer */
+      timer_start(CREATE_BUFFER);
       input_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float) * ary_size * ary_size, NULL, &err);
       output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float) * ary_size * ary_size, NULL, &err);
       cl_error_check("Couldn't create a buffer", err);
       timer_stop(CREATE_BUFFER);
-
-      timer_start(WRITE_BUFFER);
+      
       /* Write input buffer */
+      timer_start(WRITE_BUFFER);
       err = clEnqueueWriteBuffer(queue, input_buffer, CL_TRUE, 0, sizeof(float) * ary_size * ary_size, input, 0, NULL, NULL);
       cl_error_check("Couldn't create a buffer", err);
       timer_stop(WRITE_BUFFER);
-
-      timer_start(CREATE_KERNEL);
+      
       /* Create kernel */
+      timer_start(CREATE_KERNEL);
       kernel = clCreateKernel(program, "convolution", &err);
       cl_error_check("Couldn't create a kernel", err);
       timer_stop(CREATE_KERNEL);
-
-      timer_start(CREATE_KERNEL_ARGS);
+      
       /* Create kernel args */
+      timer_start(CREATE_KERNEL_ARGS);
       err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_buffer);
       err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer);
       err |= clSetKernelArg(kernel, 2, sizeof(int), &ary_size);
       cl_error_check("Couldn't create a kernel argument", err);
       timer_stop(CREATE_KERNEL_ARGS);
-
-      timer_start(LAUNCH_KERNEL);
+      
       /* Launch kernel */
+      timer_start(LAUNCH_KERNEL);
       err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, global_size, local_size, 0, NULL, &timing_event);
       cl_error_check("Couldn't enqueue the kernel", err);
       clWaitForEvents(1, &timing_event);
@@ -134,35 +137,32 @@ int main(int argc, char *argv[]) {
       clGetEventProfilingInfo(timing_event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &event_end, NULL);
       kernel_execution_time = (double)(event_end-event_start)*1e-09;
       timer_stop(LAUNCH_KERNEL);
-
-      timer_start(READ_BUFFER);
+      
       /* Read output data */
+      timer_start(READ_BUFFER);
       err = clEnqueueReadBuffer(queue, output_buffer, CL_TRUE, 0, sizeof(float) * ary_size * ary_size, output, 0, NULL, NULL);
       cl_error_check("Couldn't read the buffer", err);
       timer_stop(READ_BUFFER);
 
-      timer_start(RELEASE);
+      timer_stop(TOTAL_RESPONSE_TIME);
+      
+      /* Logging */
+      fprintf(fp, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf\n", timer_read(TOTAL_RESPONSE_TIME), timer_read(CREATE_BUFFER), timer_read(WRITE_BUFFER), timer_read(CREATE_KERNEL_ARGS), timer_read(CREATE_KERNEL), timer_read(LAUNCH_KERNEL), timer_read(READ_BUFFER), kernel_execution_time);
+      timer_clear_all();
+
       /* Release */
       clReleaseKernel(kernel);
       clReleaseMemObject(output_buffer);
       clReleaseMemObject(input_buffer); 
-      timer_stop(RELEASE);
-
-      free(input);
-      free(output);
-
-      timer_stop(TOTAL_RESPONSE_TIME);
-      printf("a\n");
-      /* Logging */
-      fprintf(fp, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf\n", timer_read(TOTAL_RESPONSE_TIME), timer_read(CREATE_BUFFER), timer_read(WRITE_BUFFER), timer_read(CREATE_KERNEL_ARGS), timer_read(CREATE_KERNEL), timer_read(LAUNCH_KERNEL), timer_read(READ_BUFFER), kernel_execution_time);
-      printf("!!\n");
-      // fflush(fp);
-      printf("flush\n");
-      printf("[%d] Total Response Time: %lf / Kernel Execution Time: %lf\n", cnt, timer_read(TOTAL_RESPONSE_TIME), kernel_execution_time);
 
       if(iteration == cnt++) break;
    }
-   
+
+   free(input);
+   free(output);
+
+   fflush(fp);
+   fclose(fp);
 
    return 0;
 }
